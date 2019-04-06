@@ -1,0 +1,12 @@
+*.iml
+*.apk
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+/app/build
+output.json
+/app/src/main/res/raw/third_party_license_metadata
+/app/src/main/res/raw/third_party_licenses

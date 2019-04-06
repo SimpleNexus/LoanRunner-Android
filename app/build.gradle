@@ -1,0 +1,65 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+android {
+    compileSdkVersion 28
+    buildToolsVersion "28.0.3"
+
+    defaultConfig {
+        applicationId "com.simplenexus.loanrunner"
+        minSdkVersion 21
+        targetSdkVersion 28
+
+        versionCode 1
+        versionName "1.0"
+
+        resConfigs "en"
+    }
+
+    signingConfigs {
+        release {
+            if(System.getenv("KSTOREFILE") != null)
+                storeFile file(System.getenv("KSTOREFILE"))
+
+            storePassword System.getenv("KSTOREPWD")
+            keyAlias System.getenv("KEYALIAS")
+            keyPassword System.getenv("KEYPWD")
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            manifestPlaceholders = [appName: "@string/app_name_debug"]
+        }
+
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+            manifestPlaceholders = [appName: "@string/app_name"]
+
+            applicationVariants.all { variant ->
+                variant.outputs.all {
+                    outputFileName = "${project.parent.name}-${defaultConfig.versionName}.apk"
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.appcompat:appcompat:1.0.2'
+    implementation 'androidx.browser:browser:1.0.0'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+}
