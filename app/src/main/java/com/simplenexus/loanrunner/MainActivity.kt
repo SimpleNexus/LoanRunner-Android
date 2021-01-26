@@ -21,30 +21,31 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.widget.FrameLayout
-import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.browser.customtabs.CustomTabsIntent
-import kotlinx.android.synthetic.main.activity_main.*
+import com.simplenexus.loanrunner.databinding.ActivityMainBinding
 
 class MainActivity: AppCompatActivity() {
 
-    private val listener = ActionBar.OnMenuVisibilityListener {
-        pico8("SetPaused", it.toString())
-    }
-
+    private lateinit var binding: ActivityMainBinding
     private var lastDpadKey = KeyEvent.KEYCODE_UNKNOWN
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        initUI()
+    }
 
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun initUI() = with(binding) {
+        setContentView(root)
         setSupportActionBar(toolbar)
         title = ""
 
@@ -58,7 +59,7 @@ class MainActivity: AppCompatActivity() {
             // touch into the correct keypress to allow our runner to jump.
 
             setOnTouchListener { _, event ->
-                when(event.action) {
+                when (event.action) {
                     KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP -> {
                         dispatchKeyEvent(KeyEvent(event.action, KeyEvent.KEYCODE_Z))
                     }
@@ -67,32 +68,27 @@ class MainActivity: AppCompatActivity() {
                 true
             }
         }
-
-        // Add a menu visibility listener which automatically pauses and
-        // unpauses the game when the menu is opened or closed.
-
-        supportActionBar?.addOnMenuVisibilityListener(listener)
     }
 
-    override fun onDestroy() {
-        supportActionBar?.removeOnMenuVisibilityListener(listener)
-        super.onDestroy()
-    }
+    // Listen for window focus changes and automatically pause and
+    // unpause the game when focus is lost or gained.
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) = pico8("SetPaused", (!hasFocus).toString())
 
     // Bit of a hack to force the WebView to resize on a config change,
     // thus triggering the CSS media queries to resize the game window.
 
-    override fun onConfigurationChanged(newConfig: Configuration?) {
+    override fun onConfigurationChanged(newConfig: Configuration): Unit = with(binding) {
         super.onConfigurationChanged(newConfig)
 
-        newConfig?.let {
+        newConfig.let {
             val density = it.densityDpi / 160f
             val width = it.screenWidthDp * density
             val height = it.screenHeightDp * density
 
             webView.layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT)
 
-            Handler().postDelayed({
+            Handler(Looper.getMainLooper()).postDelayed({
                 webView.layoutParams = FrameLayout.LayoutParams(width.toInt(), height.toInt())
             }, 50)
         }
@@ -106,7 +102,7 @@ class MainActivity: AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        Handler().postDelayed({
+        Handler(Looper.getMainLooper()).postDelayed({
             when(item.itemId) {
                 R.id.reset -> pico8("Reset")
                 R.id.sound -> pico8("ToggleSound")
@@ -124,7 +120,7 @@ class MainActivity: AppCompatActivity() {
     // only handling that (along with P for accessing the in-game pause menu).
     // However, PICO-8 also lets games use the X key, which we don't handle here.
 
-    override fun dispatchKeyEvent(event: KeyEvent?): Boolean {
+    override fun dispatchKeyEvent(event: KeyEvent?): Boolean = with(binding) {
         when(event?.action) {
             KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP -> {
                 when(event.keyCode) {
@@ -140,6 +136,15 @@ class MainActivity: AppCompatActivity() {
                         webView.dispatchKeyEvent(KeyEvent(event.action, KeyEvent.KEYCODE_P))
                         return true
                     }
+
+                    // Certain controllers, such as the one built into the
+                    // Retroid Pocket 2, send D-Pad keycodes here instead of
+                    // as hat axis events. Dispatch them to the WebView as-is.
+
+                    KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        webView.dispatchKeyEvent(KeyEvent(event.action, event.keyCode))
+                        return true
+                    }
                 }
             }
         }
@@ -153,7 +158,7 @@ class MainActivity: AppCompatActivity() {
     // Currently we're only listening to Y-axis inputs (up and down), since
     // those are the only ones that Loan Runner recognizes.
 
-    override fun dispatchGenericMotionEvent(ev: MotionEvent?): Boolean {
+    override fun dispatchGenericMotionEvent(ev: MotionEvent?): Boolean = with(binding) {
         if(ev?.action == MotionEvent.ACTION_MOVE) {
             when(ev.getAxisValue(MotionEvent.AXIS_HAT_Y)) {
                 -1f -> {
@@ -181,8 +186,9 @@ class MainActivity: AppCompatActivity() {
     // Sends commands to the PICO-8 JavaScript runtime inside the WebView,
     // depending on which options the user selects from the menu.
 
-    private fun pico8(action: String, param: String = "")
-            = webView.loadUrl("javascript:Module.pico8$action($param);")
+    private fun pico8(action: String, param: String = "") = with(binding) {
+        webView.loadUrl("javascript:Module.pico8$action($param);")
+    }
 
     // Opens the SimpleNexus website in a Chrome Custom Tab, so the user can
     // learn more about the cool stuff we work on every single day!
@@ -190,7 +196,7 @@ class MainActivity: AppCompatActivity() {
     private fun openSNWebsite() {
         val customTabs = CustomTabsIntent.Builder()
                 .setShowTitle(true)
-                .addDefaultShareMenuItem()
+                .setShareState(CustomTabsIntent.SHARE_STATE_ON)
                 .build()
 
         try {
